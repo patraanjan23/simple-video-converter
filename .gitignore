@@ -2,3 +2,5 @@ __pycache__/
 .vscode/
 venv/
 *.pyc
+test_qprocess.py
+inf_loop.py
