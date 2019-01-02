@@ -5,6 +5,7 @@ import sys
 
 from PySide2.QtWidgets import QApplication, QWidget, QFileDialog
 from PySide2.QtGui import QPixmap, QStandardItemModel, QStandardItem
+from PySide2.QtCore import QProcess, Qt
 
 from Form import Ui_Form
 
@@ -13,18 +14,24 @@ DEBUG = False
 
 class VidConvertWindow(QWidget, Ui_Form):
     """this is the main class for video converter"""
+
     def __init__(self):
         super().__init__()
         self.setupUi(self)
 
         self.available_formats = ["x", "y", "z"]
+        self.selected_files = []
+        self.process = QProcess()
+        self.progress_reader = QProcess()
 
         self.file_picker = QFileDialog(self)
+
         self.file_list_model = QStandardItemModel(self.listViewFiles)
         self.listViewFiles.setModel(self.file_list_model)
         self.type_list_model = QStandardItemModel(self.listViewTypes)
         self.listViewTypes.setModel(self.type_list_model)
 
+        self.file_list_model.itemChanged.connect(self.update_selected_files)
         self.btnStop.clicked.connect(self.stop_convertion)
         self.btnAdd.clicked.connect(self.add_files)
         self.btnConvert.clicked.connect(self.start_convertion)
@@ -47,7 +54,18 @@ class VidConvertWindow(QWidget, Ui_Form):
         list_item = QStandardItem(filename)
         list_item.setCheckable(True)
         list_item.setEditable(False)
+        list_item.setSelectable(False)
         model.appendRow(list_item)
+
+    def update_selected_files(self, item):
+        """selects the checked items"""
+        if item.checkState() == Qt.CheckState.Checked and item.text(
+        ) not in self.selected_files:
+            self.selected_files.append(item.text())
+        else:
+            self.selected_files.remove(item.text())
+        if DEBUG:
+            print(self.selected_files)
 
     def add_files(self):
         """opens file picker for choosing files"""
@@ -68,6 +86,7 @@ class VidConvertWindow(QWidget, Ui_Form):
     def stop_convertion(self):
         """stop running coversion task"""
         print("Not implemented")
+
 
 if __name__ == "__main__":
     APP = QApplication(sys.argv)
