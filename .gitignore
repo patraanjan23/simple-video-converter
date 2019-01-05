@@ -4,3 +4,6 @@ venv/
 *.pyc
 test_qprocess.py
 inf_loop.py
+*.avi
+*.mp4
+read_op.py
