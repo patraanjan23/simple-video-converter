@@ -30,6 +30,9 @@ class VidConvertWindow(QWidget, Ui_Form):
         self.time_re = re.compile(r'time=\s*([0-9:.]+) ')
         self.process = QProcess()
         self.file_picker = QFileDialog(self)
+        self.output_dir = ""
+        self.current_file_idx = 0
+        self.conversion_started = False
 
         self.output_folder_picker = QFileDialog(self)
         self.output_folder_picker.setFileMode(QFileDialog.DirectoryOnly)
@@ -101,18 +104,50 @@ class VidConvertWindow(QWidget, Ui_Form):
 
     def start_convertion(self):
         """implement conversion task"""
+        # check if output dir is already defined else get outdir
+        if not self.conversion_started:
+            self.get_output_dir()
+            self.progressBarTotal.setMaximum(len(self.selected_files))
+            self.btnConvert.setEnabled(False)
+            self.conversion_started = True
+
+        # setting up arguments
+        current_file_name = self.selected_files[self.current_file_idx]
+        current_outfile_name = Path(self.output_dir).joinpath(
+            self.get_file_name(self.current_file_idx, ".avi"))
+        self.process_argument = " -i {} {}".format(current_file_name,
+                                                   current_outfile_name)
+
+        # create a process everytime it's called
+        # NOTE: this is a local instance of the process so it changes after every call
+        process = QProcess()
+        process.readyReadStandardError.connect(
+            lambda: self.parse_output(process))
+        process.finished.connect(self.recursion_handler)
+        process.start("ffmpeg", self.process_argument.split())
+
+    def get_output_dir(self):
+        """ get the output directory """
         if self.output_folder_picker.exec_():
-            output_dir = Path(self.output_folder_picker.selectedFiles()[0])
-            print("output dir:", output_dir)
-            # self.process_argument = "-progress stderr"
-            self.process_argument = "-hwaccel d3d11va"
-            for infile in self.selected_files:
-                self.process_argument += " -i {}".format(infile)
-            for idx in range(len(self.selected_files)):
-                self.process_argument += " -map {} {}".format(
-                    idx, output_dir.joinpath(self.get_file_name(idx, ".avi")))
-            print("ffmpeg arg:", self.process_argument)
-            self.process.start("ffmpeg", self.process_argument.split())
+            self.output_dir = self.output_folder_picker.selectedFiles()[0]
+
+    def recursion_handler(self):
+        """controls the multiple process iterations"""
+        # prepare next file for xonversion
+        self.current_file_idx += 1
+        self.current_file_duration = None
+        self.progressBarCurrent.setValue(0)
+        self.progressBarTotal.setValue(self.current_file_idx)
+
+        # check if the number of files converted exceed total number
+        if self.current_file_idx == len(self.selected_files):
+            print("conversion complete!")
+            self.btnConvert.setEnabled(True)
+            self.conversion_started = False
+            return
+
+        # if everything okay, start conversion again
+        self.start_convertion()
 
     @staticmethod
     def parse_time(time):
@@ -120,6 +155,23 @@ class VidConvertWindow(QWidget, Ui_Form):
         _t = list(map(float, time.split(":")))
         return _t[0] * 3600 + _t[1] * 60 + _t[2]
 
+    def parse_output(self, process):
+        """ parses current progress """
+        # update progress
+        data = process.readAllStandardError().data().decode("utf-8")
+        if self.current_file_duration is None:
+            match = self.duration_re.search(data)
+            if match:
+                self.current_file_duration = self.parse_time(match.group(1))
+        else:
+            match = self.time_re.search(data)
+            if match:
+                current_progress = self.parse_time(match.group(1))
+                self.progressBarCurrent.setValue(
+                    min((current_progress / self.current_file_duration) * 100,
+                        100))
+
+    # deprecated
     def read_output(self):
         """process the output of ffmpeg"""
         data = self.process.readAllStandardError().data().decode("utf-8")
@@ -134,8 +186,6 @@ class VidConvertWindow(QWidget, Ui_Form):
                 self.progressBarCurrent.setValue(
                     min((current_progress / self.current_file_duration) * 100,
                         100))
-
-        # print(data)
 
     def stop_convertion(self):
         """stop running coversion task"""
