@@ -29,6 +29,7 @@ class VidConvertWindow(QWidget, Ui_Form):
         self.duration_re = re.compile(r'Duration: ([0-9:.]+)')
         self.time_re = re.compile(r'time=\s*([0-9:.]+) ')
         self.process = QProcess()
+        self.kill_process = QProcess()
         self.file_picker = QFileDialog(self)
         self.output_dir = ""
         self.current_file_idx = 0
@@ -124,8 +125,12 @@ class VidConvertWindow(QWidget, Ui_Form):
         process.readyReadStandardError.connect(
             lambda: self.parse_output(process))
         process.finished.connect(self.recursion_handler)
+        process.started.connect(lambda : self.ref_process(process))
         process.start("ffmpeg", self.process_argument.split())
 
+    def ref_process(self, process):
+        self.process = process
+    
     def get_output_dir(self):
         """ get the output directory """
         if self.output_folder_picker.exec_():
@@ -189,7 +194,12 @@ class VidConvertWindow(QWidget, Ui_Form):
 
     def stop_convertion(self):
         """stop running coversion task"""
-        print("Not implemented")
+        # print("Not implemented")
+        print("testing stop")
+        # pid = self.process.processId()
+        if sys.platform == 'linux':
+            self.kill_process.start("pkill", "ffmpeg".split())
+        self.process.terminate()
 
 
 if __name__ == "__main__":
