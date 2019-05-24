@@ -1,2 +1,5 @@
+[MASTER]
+extension-pkg-whitelist=PySide2, PyQt5
+
 [TYPECHECK]
 ignored-classes=Signal
